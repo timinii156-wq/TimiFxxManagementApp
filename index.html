@@ -1,525 +1,538 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>TimiFxx · Orders</title>
-  <!-- Telegram WebApp SDK -->
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    }
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>TimiFxx · Order Desk</title>
+    <!-- Telegram WebApp SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js?56"></script>
+    <style>
+        /* reset & base */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-    body {
-      background: var(--tg-theme-bg-color, #ffffff);
-      color: var(--tg-theme-text-color, #000000);
-      min-height: 100vh;
-      min-height: 100dvh;
-      transition: background 0.2s, color 0.2s;
-    }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: var(--tg-theme-bg-color, #ffffff);
+            color: var(--tg-theme-text-color, #000000);
+            transition: background 0.2s, color 0.2s;
+            min-height: 100vh;
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+        }
 
-    /* --- FULLSCREEN GUARD (only visible outside Telegram) --- */
-    #guard-overlay {
-      position: fixed;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      background: #1f2a36;
-      background: radial-gradient(circle at 20% 30%, #2c3e50, #0f1a24);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 9999;
-      padding: 2rem;
-      text-align: center;
-      color: white;
-      transition: opacity 0.3s ease;
-      backdrop-filter: blur(4px);
-    }
-    #guard-overlay.hidden {
-      opacity: 0;
-      pointer-events: none;
-    }
-    #guard-overlay .lock-icon {
-      font-size: 4rem;
-      margin-bottom: 1rem;
-      background: rgba(255, 255, 255, 0.08);
-      width: 100px;
-      height: 100px;
-      border-radius: 40px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      backdrop-filter: blur(4px);
-      box-shadow: 0 20px 40px rgba(0,0,0,0.5);
-    }
-    #guard-overlay h2 {
-      font-weight: 600;
-      font-size: 1.8rem;
-      letter-spacing: -0.5px;
-      margin-bottom: 0.5rem;
-    }
-    #guard-overlay p {
-      max-width: 300px;
-      opacity: 0.8;
-      font-size: 1rem;
-      line-height: 1.5;
-    }
-    #guard-overlay .tg-badge {
-      margin-top: 2rem;
-      background: rgba(255, 255, 255, 0.12);
-      padding: 0.5rem 1.8rem;
-      border-radius: 60px;
-      font-size: 0.9rem;
-      font-weight: 500;
-      letter-spacing: 0.3px;
-      border: 1px solid rgba(255,255,255,0.15);
-    }
+        /* main app container – hidden until telegram verified */
+        #app {
+            width: 100%;
+            max-width: 480px;
+            padding: 16px 16px 24px;
+            display: none;
+            flex-direction: column;
+            gap: 20px;
+        }
 
-    /* --- MAIN APP (hidden until telegram confirmed) --- */
-    #app-root {
-      display: none;
-      max-width: 480px;
-      margin: 0 auto;
-      padding: 16px 18px 100px;
-      background: var(--tg-theme-bg-color, #ffffff);
-      color: var(--tg-theme-text-color, #000000);
-      transition: background 0.2s;
-    }
-    #app-root.visible {
-      display: block;
-    }
+        /* guard overlay – full screen, shown when not in Telegram */
+        #guard-overlay {
+            position: fixed;
+            inset: 0;
+            background: var(--tg-theme-bg-color, #f0f2f5);
+            color: var(--tg-theme-text-color, #222);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 2rem;
+            z-index: 9999;
+            font-size: 1.2rem;
+            line-height: 1.5;
+            backdrop-filter: blur(2px);
+        }
+        #guard-overlay .icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+        }
+        #guard-overlay .sub {
+            font-size: 0.95rem;
+            opacity: 0.7;
+            margin-top: 0.5rem;
+        }
+        /* hide guard when telegram is active */
+        body.in-telegram #guard-overlay {
+            display: none !important;
+        }
+        body.in-telegram #app {
+            display: flex !important;
+        }
 
-    /* Telegram style header */
-    .app-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 8px 0 16px;
-      border-bottom: 1px solid var(--tg-theme-secondary-bg-color, #eaeef2);
-    }
-    .app-header h1 {
-      font-size: 1.6rem;
-      font-weight: 700;
-      letter-spacing: -0.5px;
-      background: linear-gradient(145deg, var(--tg-theme-text-color, #000), var(--tg-theme-hint-color, #5b6b7a));
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
-    }
-    .app-header .close-btn {
-      background: var(--tg-theme-secondary-bg-color, #eaeef2);
-      border: none;
-      border-radius: 30px;
-      padding: 8px 16px;
-      font-weight: 500;
-      font-size: 0.9rem;
-      color: var(--tg-theme-text-color, #000);
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.04);
-      cursor: pointer;
-      transition: 0.15s;
-    }
-    .app-header .close-btn:active {
-      opacity: 0.6;
-      transform: scale(0.96);
-    }
+        /* telegram ui patterns */
+        .card {
+            background: var(--tg-theme-secondary-bg-color, #f8f9fc);
+            border-radius: 16px;
+            padding: 18px 16px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+            transition: background 0.2s;
+        }
 
-    /* cards */
-    .order-card {
-      background: var(--tg-theme-secondary-bg-color, #f6f8fa);
-      border-radius: 24px;
-      padding: 18px 18px 14px;
-      margin-top: 18px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
-      border: 1px solid var(--tg-theme-divider-color, #e6eaee);
-      transition: 0.15s;
-    }
-    .order-card .order-id {
-      font-size: 0.8rem;
-      font-weight: 600;
-      color: var(--tg-theme-hint-color, #6d7b8a);
-      letter-spacing: 0.3px;
-      background: var(--tg-theme-bg-color, #fff);
-      padding: 2px 12px;
-      border-radius: 30px;
-      display: inline-block;
-      margin-bottom: 8px;
-      border: 1px solid var(--tg-theme-divider-color, #dce1e6);
-    }
-    .order-card .customer-row {
-      display: flex;
-      align-items: baseline;
-      gap: 8px;
-      flex-wrap: wrap;
-      margin-top: 4px;
-    }
-    .order-card .customer-name {
-      font-weight: 700;
-      font-size: 1.3rem;
-    }
-    .order-card .customer-tag {
-      background: var(--tg-theme-button-color, #3390ec);
-      color: var(--tg-theme-button-text-color, #fff);
-      padding: 2px 14px;
-      border-radius: 40px;
-      font-size: 0.7rem;
-      font-weight: 600;
-      letter-spacing: 0.2px;
-    }
-    .order-card .detail-line {
-      display: flex;
-      justify-content: space-between;
-      margin-top: 10px;
-      font-size: 0.95rem;
-      border-top: 1px solid var(--tg-theme-divider-color, #dee4e9);
-      padding-top: 12px;
-      flex-wrap: wrap;
-    }
-    .order-card .service {
-      font-weight: 500;
-    }
-    .order-card .price {
-      font-weight: 700;
-      background: var(--tg-theme-bg-color, #ffffff);
-      padding: 0 12px;
-      border-radius: 40px;
-      color: var(--tg-theme-text-color, #000);
-    }
-    .order-card .note {
-      margin-top: 10px;
-      font-size: 0.9rem;
-      background: var(--tg-theme-bg-color, #ffffff);
-      padding: 10px 14px;
-      border-radius: 20px;
-      color: var(--tg-theme-text-color, #000);
-      border-left: 4px solid var(--tg-theme-button-color, #3390ec);
-    }
-    .order-actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 12px;
-      margin-top: 14px;
-    }
-    .order-actions button {
-      background: transparent;
-      border: 1px solid var(--tg-theme-divider-color, #cbd2d9);
-      border-radius: 40px;
-      padding: 6px 18px;
-      font-size: 0.8rem;
-      font-weight: 500;
-      color: var(--tg-theme-text-color, #000);
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      background: var(--tg-theme-bg-color, #fff);
-      transition: 0.1s;
-      cursor: pointer;
-    }
-    .order-actions button:active {
-      opacity: 0.5;
-      transform: scale(0.95);
-    }
-    .order-actions .share-btn {
-      background: var(--tg-theme-button-color, #3390ec);
-      border-color: var(--tg-theme-button-color, #3390ec);
-      color: var(--tg-theme-button-text-color, #fff);
-    }
+        .order-preview {
+            background: var(--tg-theme-secondary-bg-color, #f2f4f8);
+            border-radius: 14px;
+            padding: 14px 16px;
+            border-left: 4px solid var(--tg-theme-accent-text-color, #3390ec);
+        }
 
-    .empty-state {
-      text-align: center;
-      margin: 60px 0;
-      opacity: 0.6;
-    }
+        .badge {
+            display: inline-block;
+            background: var(--tg-theme-accent-text-color, #3390ec);
+            color: var(--tg-theme-button-text-color, #ffffff);
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 2px 12px;
+            border-radius: 30px;
+            letter-spacing: 0.3px;
+        }
 
-    /* footer */
-    .app-footer {
-      margin-top: 28px;
-      text-align: center;
-      font-size: 0.75rem;
-      color: var(--tg-theme-hint-color, #7b8b9b);
-      border-top: 1px solid var(--tg-theme-divider-color, #e2e8ed);
-      padding-top: 18px;
-    }
+        .flex-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px 0;
+        }
 
-    /* status badge */
-    .status-badge {
-      background: #f2b84b;
-      color: #1a1f2a;
-      font-size: 0.65rem;
-      font-weight: 700;
-      padding: 2px 12px;
-      border-radius: 40px;
-      text-transform: uppercase;
-      letter-spacing: 0.4px;
-    }
-    .status-badge.pending {
-      background: #f2b84b;
-    }
+        .label {
+            font-size: 0.8rem;
+            opacity: 0.7;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
 
-    /* new request banner */
-    .new-request-banner {
-      background: var(--tg-theme-secondary-bg-color, #edf2f6);
-      border-radius: 20px;
-      padding: 14px 16px;
-      margin-top: 18px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      border: 1px solid var(--tg-theme-divider-color, #d6dee6);
-    }
-    .new-request-banner span {
-      font-weight: 500;
-    }
-    .new-request-banner .badge-new {
-      background: #3f8cff;
-      color: white;
-      border-radius: 30px;
-      padding: 2px 14px;
-      font-size: 0.7rem;
-      font-weight: 600;
-    }
-  </style>
+        .value {
+            font-weight: 500;
+            word-break: break-word;
+        }
+
+        .mt-2 { margin-top: 12px; }
+        .mb-1 { margin-bottom: 6px; }
+        .text-accent { color: var(--tg-theme-accent-text-color, #3390ec); }
+
+        .btn {
+            background: var(--tg-theme-button-color, #3390ec);
+            color: var(--tg-theme-button-text-color, #ffffff);
+            border: none;
+            border-radius: 12px;
+            padding: 12px 20px;
+            font-weight: 600;
+            font-size: 1rem;
+            width: 100%;
+            cursor: pointer;
+            transition: opacity 0.15s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .btn:active { opacity: 0.7; }
+        .btn-outline {
+            background: transparent;
+            border: 1.5px solid var(--tg-theme-accent-text-color, #3390ec);
+            color: var(--tg-theme-accent-text-color, #3390ec);
+        }
+
+        .divider {
+            height: 1px;
+            background: var(--tg-theme-hint-color, #d9d9d9);
+            opacity: 0.3;
+            margin: 12px 0;
+        }
+
+        /* form styling */
+        .form-group {
+            margin-bottom: 16px;
+        }
+        .form-group label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 500;
+            margin-bottom: 4px;
+            opacity: 0.8;
+        }
+        .form-group input, .form-group textarea {
+            width: 100%;
+            padding: 12px 14px;
+            background: var(--tg-theme-bg-color, #ffffff);
+            border: 1px solid var(--tg-theme-hint-color, #cccccc);
+            border-radius: 12px;
+            font-size: 0.95rem;
+            color: var(--tg-theme-text-color, #000);
+            outline: none;
+            transition: border 0.15s;
+        }
+        .form-group input:focus, .form-group textarea:focus {
+            border-color: var(--tg-theme-accent-text-color, #3390ec);
+        }
+        .form-group textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+
+        .order-card {
+            background: var(--tg-theme-secondary-bg-color, #f0f2f5);
+            border-radius: 14px;
+            padding: 14px;
+        }
+
+        /* small */
+        .text-muted {
+            opacity: 0.6;
+            font-size: 0.85rem;
+        }
+
+        .share-row {
+            display: flex;
+            gap: 10px;
+            margin-top: 4px;
+        }
+        .share-row .btn {
+            flex: 1;
+        }
+    </style>
 </head>
 <body>
 
-  <!-- GUARD OVERLAY: visible when NOT in Telegram -->
-  <div id="guard-overlay">
-    <div class="lock-icon">🔒</div>
-    <h2>Open in Telegram</h2>
-    <p>This mini app works only inside Telegram. Please launch it from a bot or the attachment menu.</p>
-    <div class="tg-badge">⚡ Telegram Mini App</div>
-  </div>
-
-  <!-- MAIN APP -->
-  <div id="app-root">
-    <div class="app-header">
-      <h1>📦 Orders</h1>
-      <button class="close-btn" id="closeAppBtn">✕ Close</button>
+    <!-- GUARD OVERLAY – shown when not in Telegram -->
+    <div id="guard-overlay">
+        <div class="icon">📱</div>
+        <div><strong>Open in Telegram</strong></div>
+        <div style="margin-top: 8px; font-size: 1rem;">This Mini App works only inside Telegram.</div>
+        <div class="sub">Please launch from a Telegram chat → Menu</div>
     </div>
 
-    <!-- dynamic orders will be injected here -->
-    <div id="ordersContainer">
-      <!-- cards rendered by js -->
-    </div>
+    <!-- MAIN APP -->
+    <div id="app">
 
-    <div class="new-request-banner">
-      <span>✨ New order request</span>
-      <span class="badge-new">+1</span>
-    </div>
+        <!-- Header / back + title -->
+        <div class="flex-row" style="padding: 4px 0;">
+            <span style="font-size: 1.6rem; font-weight: 600; letter-spacing: -0.5px;">📋 OrderDesk</span>
+            <span id="back-button" style="background: var(--tg-theme-secondary-bg-color, #e9edf2); padding: 6px 14px; border-radius: 30px; font-size: 0.8rem; display: flex; align-items: center; gap: 4px; cursor: pointer; transition: 0.1s;">
+                <span>✕</span> Close
+            </span>
+        </div>
 
-    <div class="app-footer">
-      TimiFxx · v1 · powered by Telegram
-    </div>
-  </div>
+        <!-- quick order preview (last order) -->
+        <div class="card order-preview" id="lastOrderPreview">
+            <div class="flex-row">
+                <span class="badge">NEW</span>
+                <span class="label">Order #TG-2026-005</span>
+            </div>
+            <div style="margin-top: 6px; font-weight: 500;">👤 Dave · @tiimex203</div>
+            <div class="flex-row" style="margin-top: 4px;">
+                <span>Telegram Destination Compliance Check</span>
+                <span style="font-weight: 600;">$40</span>
+            </div>
+            <div class="text-muted" style="margin-top: 2px;">⚡ pending · Aug 18, 2026</div>
+        </div>
 
-  <script>
-    (function() {
-      // -----------------------------------------------------------------
-      // 1) ENVIRONMENT GUARD: detect Telegram WebApp
-      // -----------------------------------------------------------------
-      const guard = document.getElementById('guard-overlay');
-      const appRoot = document.getElementById('app-root');
-
-      // Reliable detection: Telegram.WebApp.initData is non-empty when inside Telegram
-      const isTelegram = !!(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData);
-
-      if (isTelegram) {
-        guard.classList.add('hidden');
-        appRoot.classList.add('visible');
-
-        // init Telegram WebApp
-        const tg = window.Telegram.WebApp;
-        tg.expand(); // request fullscreen
-        tg.ready();
-
-        // Telegram theme: apply CSS custom properties
-        const theme = tg.themeParams || {};
-        const root = document.documentElement;
-        if (theme.bg_color) root.style.setProperty('--tg-theme-bg-color', theme.bg_color);
-        if (theme.text_color) root.style.setProperty('--tg-theme-text-color', theme.text_color);
-        if (theme.hint_color) root.style.setProperty('--tg-theme-hint-color', theme.hint_color);
-        if (theme.link_color) root.style.setProperty('--tg-theme-link-color', theme.link_color);
-        if (theme.button_color) root.style.setProperty('--tg-theme-button-color', theme.button_color);
-        if (theme.button_text_color) root.style.setProperty('--tg-theme-button-text-color', theme.button_text_color);
-        if (theme.secondary_bg_color) root.style.setProperty('--tg-theme-secondary-bg-color', theme.secondary_bg_color);
-        if (theme.divider_color) root.style.setProperty('--tg-theme-divider-color', theme.divider_color);
-
-        // -----------------------------------------------------------------
-        // 2) DATA: orders array (exactly as from the image)
-        // -----------------------------------------------------------------
-        const orders = [
-          {
-            id: "TG-2026-005",
-            customer: "@tiimex203",
-            name: "Dave",
-            email: "tilmex2234@gmail.com",
-            service: "Telegram Destination Compliance Check - $40",
-            price: "$40",
-            status: "pending",
-            date: "Aug 18, 2026",
-            details: "Help me with that now"
-          },
-          {
-            id: "TG-2026-004", // previous order (Mike) – we add for context
-            customer: "@timifxx203",
-            name: "Mike",
-            email: "timini156@gmail.com",
-            service: "Approved Bot - $60",
-            price: "$60",
-            status: "pending",
-            date: "Aug 17, 2026",
-            details: "I need it as fast as possible"
-          }
-        ];
-
-        // -----------------------------------------------------------------
-        // 3) RENDER ORDERS
-        // -----------------------------------------------------------------
-        const container = document.getElementById('ordersContainer');
-
-        function renderOrders() {
-          if (!container) return;
-          if (!orders.length) {
-            container.innerHTML = `<div class="empty-state">✨ No orders yet</div>`;
-            return;
-          }
-
-          // sort by date (newest first) – just for demo, keep as is
-          let html = '';
-          orders.forEach((o, idx) => {
-            const statusClass = o.status === 'pending' ? 'pending' : '';
-            html += `
-              <div class="order-card" data-order-id="${o.id}">
-                <div class="order-id">${o.id}</div>
-                <div class="customer-row">
-                  <span class="customer-name">${o.name}</span>
-                  <span class="customer-tag">${o.customer}</span>
-                  <span class="status-badge ${statusClass}">${o.status}</span>
+        <!-- form: new order request (customer details) -->
+        <div class="card">
+            <div style="font-weight: 600; font-size: 1.1rem; margin-bottom: 12px;">📩 New order request</div>
+            <form id="orderForm">
+                <div class="form-group">
+                    <label>Name</label>
+                    <input type="text" id="customerName" placeholder="e.g. Mike" value="Mike" />
                 </div>
-                <div class="detail-line">
-                  <span class="service">${o.service}</span>
-                  <span class="price">${o.price}</span>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="customerEmail" placeholder="timini156@gmail.com" value="timini156@gmail.com" />
                 </div>
-                <div class="note">📌 ${o.details}</div>
-                <div style="font-size:0.7rem; color: var(--tg-theme-hint-color, #7a8a9a); margin-top: 8px;">${o.date}</div>
-                <div class="order-actions">
-                  <button class="share-btn" data-share-id="${o.id}">📤 Share</button>
+                <div class="form-group">
+                    <label>Telegram @username</label>
+                    <input type="text" id="customerTelegram" placeholder="@timifxx203" value="@timifxx203" />
                 </div>
-              </div>
-            `;
-          });
-          container.innerHTML = html;
+                <div class="form-group">
+                    <label>Asset / Service</label>
+                    <input type="text" id="assetService" placeholder="Approved Bot - $60" value="Approved Bot - $60" />
+                </div>
+                <div class="form-group">
+                    <label>Details</label>
+                    <textarea id="orderDetails" placeholder="I need it as fast as possible">I need it as fast as possible</textarea>
+                </div>
+                <button type="submit" class="btn" id="submitOrderBtn">📤 Place order (auto-reply)</button>
+            </form>
+        </div>
 
-          // attach share event listeners
-          document.querySelectorAll('[data-share-id]').forEach(btn => {
-            btn.addEventListener('click', function(e) {
-              const orderId = this.getAttribute('data-share-id');
-              const order = orders.find(o => o.id === orderId);
-              if (!order) return;
-              shareOrder(order);
+        <!-- auto-reply message preview & share -->
+        <div class="card">
+            <div class="flex-row">
+                <span style="font-weight: 600;">🤖 Auto-reply</span>
+                <span class="badge" style="background: var(--tg-theme-accent-text-color, #34a853);">active</span>
+            </div>
+            <div id="autoReplyMessage" class="order-card" style="margin-top: 8px; background: var(--tg-theme-bg-color, #f5f7fa);">
+                ✅ Your order has been received!<br/>
+                We'll process it shortly. Thank you 🙌
+            </div>
+            <div class="share-row" style="margin-top: 12px;">
+                <button class="btn" id="shareReplyBtn" style="flex:2;">📤 Share as message</button>
+                <button class="btn btn-outline" id="copyReplyBtn" style="flex:1;">📋 Copy</button>
+            </div>
+        </div>
+
+        <!-- order array tracking (reference) -->
+        <div class="card" style="background: var(--tg-theme-secondary-bg-color, #eef1f5);">
+            <div class="flex-row">
+                <span style="font-weight: 500;">📦 Tracking</span>
+                <span class="label" id="orderCount">1 order</span>
+            </div>
+            <div style="font-family: monospace; font-size: 0.75rem; background: var(--tg-theme-bg-color, #fff); padding: 10px; border-radius: 10px; margin-top: 6px; overflow-x: auto; white-space: pre-wrap; word-break: break-all;">
+                <span id="trackingArrayDisplay">{"id":"TG-2026-005","customer":"@tiimex203","service":"Telegram Destination Compliance Check - $40","price":"$$40","status":"pending","date":"Aug 18, 2026"}</span>
+            </div>
+            <button class="btn btn-outline" id="addTrackingBtn" style="margin-top: 10px; padding: 8px;">➕ Add current order to tracking</button>
+        </div>
+
+    </div>
+
+    <script>
+        (function() {
+            // ----- Telegram WebApp init -----
+            const tg = window.Telegram?.WebApp;
+            const isTelegram = !!(tg && tg.initDataUnsafe && tg.initData);
+
+            // guard + app visibility
+            const body = document.body;
+            const guard = document.getElementById('guard-overlay');
+            const app = document.getElementById('app');
+
+            if (isTelegram) {
+                body.classList.add('in-telegram');
+                // expand to full height
+                tg.expand();
+                // theme
+                if (tg.colorScheme) {
+                    document.documentElement.style.setProperty('--tg-theme-bg-color', tg.backgroundColor || '#ffffff');
+                    document.documentElement.style.setProperty('--tg-theme-text-color', tg.textColor || '#000000');
+                    document.documentElement.style.setProperty('--tg-theme-secondary-bg-color', tg.secondaryBackgroundColor || '#f0f2f5');
+                    document.documentElement.style.setProperty('--tg-theme-accent-text-color', tg.accentTextColor || '#3390ec');
+                    document.documentElement.style.setProperty('--tg-theme-button-color', tg.buttonColor || '#3390ec');
+                    document.documentElement.style.setProperty('--tg-theme-button-text-color', tg.buttonTextColor || '#ffffff');
+                    document.documentElement.style.setProperty('--tg-theme-hint-color', tg.hintColor || '#b0b8c0');
+                }
+                // back button
+                tg.BackButton.onClick(() => {
+                    tg.close();
+                });
+                tg.BackButton.show();
+
+                // close button (custom) also closes app
+                document.getElementById('back-button').addEventListener('click', function() {
+                    tg.close();
+                });
+
+            } else {
+                // not in telegram – guard is visible, app hidden
+                body.classList.remove('in-telegram');
+                // override guard colors with light theme (fallback)
+                guard.style.background = '#f2f4f8';
+                guard.style.color = '#1e1e1e';
+            }
+
+            // ----- data store (orders array) -----
+            let orders = [];
+            // prefill with the given order
+            const initialOrder = {
+                id: "TG-2026-005",
+                customer: "@tiimex203",
+                service: "Telegram Destination Compliance Check - $40",
+                price: "$$40",
+                status: "pending",
+                date: "Aug 18, 2026"
+            };
+            orders.push(initialOrder);
+            updateTrackingDisplay();
+
+            // references
+            const trackingDisplay = document.getElementById('trackingArrayDisplay');
+            const orderCount = document.getElementById('orderCount');
+            const lastOrderPreview = document.getElementById('lastOrderPreview');
+
+            // form fields
+            const nameInput = document.getElementById('customerName');
+            const emailInput = document.getElementById('customerEmail');
+            const tgInput = document.getElementById('customerTelegram');
+            const assetInput = document.getElementById('assetService');
+            const detailsInput = document.getElementById('orderDetails');
+            const submitBtn = document.getElementById('submitOrderBtn');
+
+            // auto-reply message
+            const replyMsgEl = document.getElementById('autoReplyMessage');
+
+            // ----- helper: update tracking display -----
+            function updateTrackingDisplay() {
+                if (orders.length === 0) {
+                    trackingDisplay.textContent = 'No orders yet';
+                    orderCount.textContent = '0 orders';
+                    // reset preview
+                    lastOrderPreview.innerHTML = `<div class="text-muted">No recent orders</div>`;
+                    return;
+                }
+                // show all orders as JSON array (pretty)
+                const jsonStr = JSON.stringify(orders, null, 2);
+                trackingDisplay.textContent = jsonStr;
+                orderCount.textContent = orders.length + ' order' + (orders.length > 1 ? 's' : '');
+
+                // update preview with most recent order (last in array)
+                const last = orders[orders.length - 1];
+                lastOrderPreview.innerHTML = `
+                    <div class="flex-row">
+                        <span class="badge">${last.status === 'pending' ? '⏳' : '✅'} ${last.status}</span>
+                        <span class="label">${last.id}</span>
+                    </div>
+                    <div style="margin-top: 6px; font-weight: 500;">👤 ${last.customer}</div>
+                    <div class="flex-row" style="margin-top: 4px;">
+                        <span>${last.service}</span>
+                        <span style="font-weight: 600;">${last.price}</span>
+                    </div>
+                    <div class="text-muted" style="margin-top: 2px;">📅 ${last.date}</div>
+                `;
+            }
+
+            // ----- add order from form (and auto-reply) -----
+            function addOrderFromForm() {
+                const name = nameInput.value.trim() || 'Anonymous';
+                const email = emailInput.value.trim() || 'no-email';
+                const tgHandle = tgInput.value.trim() || '@unknown';
+                const asset = assetInput.value.trim() || 'Service';
+                const details = detailsInput.value.trim() || 'No details';
+
+                // build new order object
+                const newOrder = {
+                    id: `TG-2026-${String(orders.length + 1).padStart(3, '0')}`,
+                    customer: tgHandle,
+                    service: asset,
+                    price: '$' + (asset.match(/\$(\d+)/)?.[1] || '0'),
+                    status: 'pending',
+                    date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                };
+                orders.push(newOrder);
+                updateTrackingDisplay();
+
+                // auto-reply message (customised)
+                const replyMsg = `✅ Order ${newOrder.id} received for ${newOrder.customer}.\nService: ${newOrder.service}\nWe'll get back to you shortly. 🙌`;
+                replyMsgEl.innerHTML = replyMsg.replace(/\n/g, '<br/>');
+
+                // (optional) show a small alert via haptic if available
+                if (isTelegram && tg.HapticFeedback) {
+                    tg.HapticFeedback.notificationOccurred('success');
+                }
+
+                // clear form? keep as is for demo, but maybe reset some
+                // we keep values for rapid re-order
+            }
+
+            // ----- submit form -----
+            document.getElementById('orderForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                if (!isTelegram) {
+                    alert('This app works only inside Telegram.');
+                    return;
+                }
+                addOrderFromForm();
+                // also send a message via tg.sendData? we use share for that.
+                // we auto-reply inside the app, but we also can send as message.
+                // but we keep share explicit.
             });
-          });
-        }
 
-        // -----------------------------------------------------------------
-        // 4) SHARE FUNCTIONALITY via tg.sendData
-        // -----------------------------------------------------------------
-        function shareOrder(order) {
-          const tg = window.Telegram?.WebApp;
-          if (!tg) {
-            alert('Telegram WebApp not available');
-            return;
-          }
-
-          // Build a nice message
-          const message = `📋 Order ${order.id}\n` +
-                          `👤 ${order.name} (${order.customer})\n` +
-                          `📧 ${order.email || '—'}\n` +
-                          `🛠 ${order.service}\n` +
-                          `💬 ${order.details}\n` +
-                          `📅 ${order.date}\n` +
-                          `🔖 ${order.status}`;
-
-          // sendData sends data to the bot that opened the mini app
-          try {
-            tg.sendData(JSON.stringify({
-              action: 'share_order',
-              orderId: order.id,
-              text: message
-            }));
-            // Haptic feedback
-            if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-          } catch (err) {
-            console.warn('sendData error', err);
-            // fallback: copy to clipboard? but we prefer sendData.
-            // we'll show a toast-like alert
-            alert('Share via Telegram: ' + message);
-          }
-        }
-
-        // -----------------------------------------------------------------
-        // 5) BACK BUTTON support (close app)
-        // -----------------------------------------------------------------
-        function closeApp() {
-          const tg = window.Telegram?.WebApp;
-          if (tg) {
-            tg.close();
-          } else {
-            window.history.back();
-          }
-        }
-
-        // attach close button
-        document.getElementById('closeAppBtn')?.addEventListener('click', closeApp);
-
-        // BackButton from Telegram SDK
-        if (window.Telegram?.WebApp) {
-          const tg = window.Telegram.WebApp;
-          if (tg.BackButton) {
-            tg.BackButton.show();
-            tg.BackButton.onClick(() => {
-              closeApp();
+            // ----- share auto-reply as message (tg.sendData) -----
+            document.getElementById('shareReplyBtn').addEventListener('click', function() {
+                if (!isTelegram) {
+                    alert('Share only available in Telegram.');
+                    return;
+                }
+                const msg = replyMsgEl.innerText || '✅ Your order has been received! We will process it shortly.';
+                // sendData sends a string to the bot
+                if (tg.sendData) {
+                    tg.sendData(JSON.stringify({ action: 'share_reply', message: msg }));
+                    // haptic
+                    if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+                    // show small feedback
+                    replyMsgEl.innerHTML = msg + '<br/><span style="font-size:0.8rem;opacity:0.6;">📤 sent to bot</span>';
+                } else {
+                    alert('sendData not available.');
+                }
             });
-          }
-        }
 
-        // -----------------------------------------------------------------
-        // 6) INIT
-        // -----------------------------------------------------------------
-        renderOrders();
+            // ----- copy reply to clipboard (fallback) -----
+            document.getElementById('copyReplyBtn').addEventListener('click', function() {
+                const text = replyMsgEl.innerText;
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(text).then(() => {
+                        if (isTelegram && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                        alert('Copied to clipboard!');
+                    }).catch(() => alert('Could not copy.'));
+                } else {
+                    // fallback
+                    const ta = document.createElement('textarea');
+                    ta.value = text;
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand('copy');
+                    ta.remove();
+                    alert('Copied!');
+                }
+            });
 
-        // handle theme changes (if user switches)
-        if (window.Telegram?.WebApp?.onThemeChanged) {
-          window.Telegram.WebApp.onThemeChanged(() => {
-            const newTheme = window.Telegram.WebApp.themeParams || {};
-            const root = document.documentElement;
-            if (newTheme.bg_color) root.style.setProperty('--tg-theme-bg-color', newTheme.bg_color);
-            if (newTheme.text_color) root.style.setProperty('--tg-theme-text-color', newTheme.text_color);
-            if (newTheme.hint_color) root.style.setProperty('--tg-theme-hint-color', newTheme.hint_color);
-            if (newTheme.button_color) root.style.setProperty('--tg-theme-button-color', newTheme.button_color);
-            if (newTheme.button_text_color) root.style.setProperty('--tg-theme-button-text-color', newTheme.button_text_color);
-            if (newTheme.secondary_bg_color) root.style.setProperty('--tg-theme-secondary-bg-color', newTheme.secondary_bg_color);
-            if (newTheme.divider_color) root.style.setProperty('--tg-theme-divider-color', newTheme.divider_color);
-          });
-        }
+            // ----- add current form data to tracking (manually) -----
+            document.getElementById('addTrackingBtn').addEventListener('click', function() {
+                if (!isTelegram) {
+                    alert('Only in Telegram.');
+                    return;
+                }
+                // add a new order based on form, same as submit but without auto-reply maybe.
+                addOrderFromForm();
+                // show feedback
+                if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+            });
 
-      } else {
-        // Not in Telegram: guard remains visible, app hidden.
-        // We also keep the guard visible (default)
-        guard.classList.remove('hidden');
-        appRoot.classList.remove('visible');
-        // optional: show a small hint
-      }
+            // if not in telegram, we can still show guard, but we also want to show a message.
+            // We also handle edge: if somehow tg is present but initData missing.
+            if (!isTelegram) {
+                // guard is visible, app hidden.
+                // we also add a small hint in console.
+                console.log('🔒 Telegram Mini App – please open inside Telegram.');
+            }
 
-    })();
-  </script>
+            // initial auto-reply message from the order we have
+            const initialReply = `✅ Order TG-2026-005 received for @tiimex203.\nService: Telegram Destination Compliance Check - $40\nWe'll process it shortly. 🙌`;
+            replyMsgEl.innerHTML = initialReply.replace(/\n/g, '<br/>');
+
+            // set default form values from the order preview
+            // already set via html value, but we set again to match preview.
+            // name: Mike, email: timini156@gmail.com, tg: @timifxx203, asset: Approved Bot - $60
+            // these are already pre-filled.
+
+            // update order count
+            updateTrackingDisplay();
+
+            // if telegram, expand again after load
+            if (isTelegram && tg) {
+                tg.expand();
+                // listen to theme changes
+                tg.onEvent('themeChanged', function() {
+                    document.documentElement.style.setProperty('--tg-theme-bg-color', tg.backgroundColor || '#ffffff');
+                    document.documentElement.style.setProperty('--tg-theme-text-color', tg.textColor || '#000000');
+                    document.documentElement.style.setProperty('--tg-theme-secondary-bg-color', tg.secondaryBackgroundColor || '#f0f2f5');
+                    document.documentElement.style.setProperty('--tg-theme-accent-text-color', tg.accentTextColor || '#3390ec');
+                    document.documentElement.style.setProperty('--tg-theme-button-color', tg.buttonColor || '#3390ec');
+                    document.documentElement.style.setProperty('--tg-theme-button-text-color', tg.buttonTextColor || '#ffffff');
+                    document.documentElement.style.setProperty('--tg-theme-hint-color', tg.hintColor || '#b0b8c0');
+                });
+            }
+
+        })();
+    </script>
+
 </body>
 </html>
